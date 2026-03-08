@@ -814,9 +814,9 @@
         const emailSubject = `Stafplanning ${nameInput}`;
         
         let emailBody = `Beste Patricia,\n\n`;
-        emailBody += `Hierbij geef ik graag mijn wensen door om te komen staffen. In de planningskalender heb ik de volgende dagen aangevinkt als beschikbaar:\n\n`;
+        emailBody += `Hierbij geef ik graag mijn wensen door om te komen staffen. De volgende dagen ben ik beschikbaar en wil graag komen staffen:\n\n`;
         emailBody += selectedDates.join("\n");
-        emailBody += `\n\nMochten er nog vragen zijn, of als het lastig is in te plannen, dan hoor ik het graag. Ik hoop dat het lukt!\n\n`;
+        emailBody += `\n\nMochten er nog vragen zijn, dan hoor ik het graag. Ik hoop dat het lukt!\n\n`;
         emailBody += `Met vriendelijke groet,\n\n${nameInput}`;
 
         const mailtoLink = `mailto:${emailTo}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
