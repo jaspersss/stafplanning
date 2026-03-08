@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stafplanning Buitenzorg - Beschikbaarheid Opgeven</title>
+    <style>
+        :root {
+            --buitenzorg-green: #2d5a27;
+            --wood-brown: #8b5a2b;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0 0 20px 0; /* Padding boven weggehaald voor de waarschuwingsbalk */
+            background-color: var(--bg-color);
+            color: var(--text-main);
+        }
+
+        /* MOBIELE ROTATIE WAARSCHUWING */
+        .rotate-warning {
+            display: none;
+            background-color: #f39c12;
+            color: white;
+            text-align: center;
+            padding: 12px;
+            font-size: 1.1em;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 9999;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Toon waarschuwing alleen op smalle schermen in portrait-modus */
+        @media (max-width: 768px) and (orientation: portrait) {
+            .rotate-warning {
+                display: block;
+            }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: var(--buitenzorg-green);
+            border-bottom: 3px solid var(--wood-brown);
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 2.2em;
+        }
+
+        .intro-text {
+            background: #e8f5e9;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border-left: 6px solid var(--buitenzorg-green);
+            margin-bottom: 20px;
+            font-size: 1.1em;
+            line-height: 1.5;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .controls {
+            margin: 20px 0 30px 0;
+            display: flex;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 6px solid var(--wood-brown);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="text"], select {
+            padding: 10px 15px;
+            font-size: 1.1em;
+            border-radius: 6px;
+            border: 2px solid var(--buitenzorg-green);
+            background-color: white;
+            color: var(--text-main);
+            font-weight: bold;
+        }
+        
+        select { color: var(--buitenzorg-green); cursor: pointer; }
+
+        .btn-stats {
+            background-color: var(--wood-brown);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn-stats:hover:not(:disabled) { background-color: #6a4421; transform: translateY(-1px); }
+        .btn-stats:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        .legend {
+            margin-left: auto;
+            display: flex;
+            gap: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+            flex-wrap: wrap;
+        }
+        
+        .legend span { padding: 4px 8px; border-radius: 4px; color: white; }
+        .bg-staff { background-color: #27ae60; }
+        .bg-empty { background-color: #e74c3c; }
+        .bg-event { background-color: #f39c12; }
+        .bg-holiday { background-color: #3498db; }
+        .bg-schoolholiday { background-color: #8e44ad; }
+        .bg-closed { background-color: #95a5a6; }
+
+        .month-block {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .month-divider {
+            background-color: var(--buitenzorg-green);
+            color: white;
+            padding: 12px 20px;
+            margin: 0;
+            font-size: 1.5em;
+            text-align: center;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .month-divider.closed-month { background-color: #7f8c8d; }
+
+        .days-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            background: #f8f9fa;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .days-header div {
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            color: #555;
+            border-right: 1px solid #ddd;
+        }
+
+        .week-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-auto-rows: minmax(28px, auto);
+            border-bottom: 1px solid #ddd;
+            position: relative;
+        }
+
+        .bg-cell {
+            grid-row: 1 / -1;
+            border-right: 1px solid #eee;
+            min-height: 110px;
+        }
+        .bg-cell.bg-weekend { background-color: #fafafa; }
+        .bg-cell.out-of-year { background-color: #f1f1f1; opacity: 0.6; }
+
+        .day-header-cell {
+            grid-row: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            z-index: 1;
+        }
+
+        .day-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--buitenzorg-green);
+        }
+
+        .day-num {
+            font-size: 0.95em;
+            font-weight: bold;
+            color: #333;
+        }
+        .day-header-cell.out-of-year .day-num { color: #aaa; }
+
+        .event-bar {
+            margin: 2px 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            font-size: 0.85em;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            z-index: 10;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            cursor: default;
+        }
+
+        .event-bar:hover { filter: brightness(1.1); transform: scale(1.02); transition: all 0.1s ease; }
+
+        .action-footer {
+            margin-top: 40px;
+            margin-bottom: 60px;
+            text-align: center;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-top: 6px solid var(--wood-brown);
+        }
+
+        .btn-submit {
+            background-color: var(--buitenzorg-green);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.3em;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn-submit:hover { background-color: #1e3d1a; transform: translateY(-2px); }
+        .btn-submit:active { transform: translateY(0); }
+
+        .loading { font-style: italic; color: var(--wood-brown); font-size: 1.2em; text-align: center; padding: 40px; }
+
+        /* Modal (Statistieken Popup) Styling */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6); display: none;
+            justify-content: center; align-items: center; z-index: 1000;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background: white; padding: 30px; border-radius: 12px;
+            max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border-top: 6px solid var(--buitenzorg-green);
+        }
+
+        .modal-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            border-bottom: 2px solid #eee; padding-bottom: 15px; margin-bottom: 20px; 
+        }
+        
+        .modal-header h2 { margin: 0; color: var(--wood-brown); }
+        
+        .close-btn { 
+            background: none; border: none; font-size: 2em; line-height: 1; 
+            cursor: pointer; color: #999; transition: color 0.2s;
+        }
+        .close-btn:hover { color: #333; }
+
+        .stat-table { width: 100%; border-collapse: collapse; }
+        .stat-table th, .stat-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .stat-table th { background: #f9f9f9; color: var(--buitenzorg-green); font-size: 1.1em; }
+        .stat-table tr:hover { background: #fdfdfd; }
+        .stat-table td:last-child { font-weight: bold; color: var(--wood-brown); text-align: right; padding-right: 20px; }
+        .stat-table th:last-child { text-align: right; padding-right: 20px; }
+        
+        /* Highlight voor eigen naam */
+        .highlight-user {
+            background-color: #e8f5e9 !important;
+            border-left: 4px solid var(--buitenzorg-green);
+        }
+        .highlight-user td {
+            font-weight: bold;
+            color: var(--buitenzorg-green);
+        }
+    </style>
+</head>
+<body>
+
+<div class="rotate-warning">
+    📱 Tip: Draai je telefoon een kwartslag (horizontaal) voor het beste overzicht van de kalender!
+</div>
+
+<div class="container">
+    <h1>🏕️ Geef je beschikbaarheid door</h1>
+    
+    <p class="intro-text">
+        <strong>Wil jij meedraaien als kampstaf op Buitenzorg?</strong><br>
+        Vul hieronder je naam in en selecteer het jaartal. <strong>Vink in de kalender de dagen aan</strong> waarop jij beschikbaar bent of zou willen staffen. De kalender toont of er al staf staat, wanneer het vakantie is en welke weekenden nog leeg zijn. Klaar met je keuzes? Klik dan helemaal onderaan op de groene knop om jouw wensen direct naar de planning te sturen!
+    </p>
+
+    <div class="controls">
+        <div class="input-group">
+            <label for="userName"><strong>Jouw naam:</strong></label>
+            <input type="text" id="userName" placeholder="Vul je voor- en achternaam in">
+        </div>
+
+        <div class="input-group">
+            <label for="yearSelect" style="margin-left: 15px;"><strong>Jaar:</strong></label>
+            <select id="yearSelect" disabled>
+                <option>Laden...</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <button id="statsBtn" class="btn-stats" onclick="showStatistics()" disabled>Statistieken 📊</button>
+        </div>
+        
+        <div class="legend">
+            <span class="bg-staff">Staf Ingepland</span>
+            <span class="bg-event">Kamp/Event</span>
+            <span class="bg-schoolholiday">Schoolvakantie</span>
+            <span class="bg-holiday">Feestdag</span>
+            <span class="bg-empty">⚠️ Geen staf</span>
+        </div>
+    </div>
+
+    <div id="scheduleContainer">
+        <p class="loading">🌲 De vloeiende kalender grid wordt opgebouwd. Een moment geduld...</p>
+    </div>
+
+    <div class="action-footer" id="actionFooter" style="display: none;">
+        <h2>Klaar met aanvinken?</h2>
+        <p>Klik op de knop hieronder. Er wordt automatisch een e-mail geopend met daarin een handig lijstje van de door jou gekozen data.</p>
+        <button class="btn-submit" onclick="generateEmail()">Stuur mijn aanvraag door ✉️</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="statsModal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>Staf Dagen in <span id="statsYear"></span></h2>
+            <button class="close-btn" onclick="document.getElementById('statsModal').style.display='none'">&times;</button>
+        </div>
+        <div id="statsBody">
+            </div>
+    </div>
+</div>
+
+<script>
+    const targetUrl = "https://www.labelbooking.nl/calendar/planning/all.ics?organisation=5cc47752-2b5a-4664-9f45-9748deea1939&user=273a8401-5005-47cc-8e8b-ededa19d847d";
+    const holidayTarget = "https://calendar.google.com/calendar/ical/nl.dutch%23holiday%40group.v.calendar.google.com/public/basic.ics";
+    const noordUrl = "https://agenda-abonnement.nl/schoolvakantiesnoordnederland.ics";
+    const middenUrl = "https://agenda-abonnement.nl/schoolvakantiesmiddennederland.ics";
+    const zuidUrl = "https://agenda-abonnement.nl/schoolvakantieszuidnederland.ics";
+    
+    const proxies = [
+        "https://api.codetabs.com/v1/proxy?quest=",
+        "https://api.allorigins.win/raw?url=",
+        "https://corsproxy.io/?"
+    ];
+
+    let allParsed = [];
+
+    function parseICSDate(str) {
+        if (!str) return null;
+        const numbers = str.replace(/[^0-9]/g, '');
+        if (numbers.length < 8) return null;
+        
+        let y = parseInt(numbers.substring(0, 4));
+        let m = parseInt(numbers.substring(4, 6)) - 1;
+        let d = parseInt(numbers.substring(6, 8));
+        
+        let hasTime = numbers.length >= 14;
+        let h = hasTime ? parseInt(numbers.substring(8, 10)) : 0;
+        let min = hasTime ? parseInt(numbers.substring(10, 12)) : 0;
+        let s = hasTime ? parseInt(numbers.substring(12, 14)) : 0;
+        
+        return { date: new Date(y, m, d, h, min, s), hasTime: hasTime };
+    }
+
+    function parseICS(icsData) {
+        const events = [];
+        let currentEvent = null;
+        const lines = icsData.split(/\r\n|\n|\r/);
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            while (i + 1 < lines.length && (lines[i+1].startsWith(' ') || lines[i+1].startsWith('\t'))) {
+                i++; line += lines[i].substring(1);
+            }
+            
+            if (line.startsWith('BEGIN:VEVENT')) currentEvent = {};
+            else if (line.startsWith('END:VEVENT') && currentEvent) {
+                if (currentEvent.startRaw) {
+                    currentEvent.start = currentEvent.startRaw.date;
+                    currentEvent.start.setHours(0,0,0,0); 
+                    
+                    if (currentEvent.endRaw) {
+                        if (!currentEvent.endRaw.hasTime) {
+                            currentEvent.end = new Date(currentEvent.endRaw.date.getTime() - 1);
+                        } else {
+                            currentEvent.end = new Date(currentEvent.endRaw.date.getTime());
+                        }
+                    } else {
+                        currentEvent.end = new Date(currentEvent.start);
+                    }
+                    currentEvent.end.setHours(23,59,59,999); 
+                    events.push(currentEvent);
+                }
+                currentEvent = null;
+            } else if (currentEvent) {
+                if (line.startsWith('SUMMARY')) currentEvent.summary = line.substring(line.indexOf(':') + 1).replace(/\\,/g, ',');
+                else if (line.startsWith('DESCRIPTION')) currentEvent.description = line.substring(line.indexOf(':') + 1).replace(/\\n/g, ' ').replace(/\\,/g, ',');
+                else if (line.startsWith('DTSTART')) currentEvent.startRaw = parseICSDate(line.substring(line.indexOf(':') + 1));
+                else if (line.startsWith('DTEND')) currentEvent.endRaw = parseICSDate(line.substring(line.indexOf(':') + 1));
+            }
+        }
+        return events;
+    }
+
+    function processHolidays(data, regionPrefix) {
+        if(!data) return [];
+        let events = parseICS(data);
+        events.forEach(e => {
+            e.type = 'schoolholiday';
+            e.summary = `[${regionPrefix}] ${e.summary}`;
+        });
+        return events;
+    }
+
+    function isOverlapping(start1, end1, start2, end2) {
+        return start1 <= end2 && end1 >= start2;
+    }
+
+    async function fetchICSWithFallback(url) {
+        for (let proxy of proxies) {
+            try {
+                let res = await fetch(proxy + encodeURIComponent(url));
+                if (res.ok) {
+                    let text = await res.text();
+                    if (text.includes('BEGIN:VCALENDAR')) return text;
+                }
+            } catch (e) {
+                console.warn(`Proxy mislukt: ${proxy} voor URL: ${url}`);
+            }
+        }
+        return ''; 
+    }
+
+    Promise.all([
+        fetchICSWithFallback(targetUrl), 
+        fetchICSWithFallback(holidayTarget), 
+        fetchICSWithFallback(noordUrl), 
+        fetchICSWithFallback(middenUrl), 
+        fetchICSWithFallback(zuidUrl)
+    ]).then(([buitenzorgData, holidayData, noordData, middenData, zuidData]) => {
+        
+        if (!buitenzorgData) {
+            document.getElementById('scheduleContainer').innerHTML = `
+                <div style="text-align: center; color: #c0392b; padding: 40px; font-size: 1.2em; background: #fff; border-radius: 8px;">
+                    <strong>Oeps! Kan de kalender even niet ophalen.</strong><br>
+                    De gratis tussenservers (proxy's) lijken tijdelijk overbelast te zijn.<br>
+                    Probeer de pagina over een minuutje te verversen!
+                </div>`;
+            return;
+        }
+
+        if (buitenzorgData) {
+            let rawEvents = parseICS(buitenzorgData);
+            rawEvents.forEach(e => {
+                let s = e.summary ? e.summary.toLowerCase() : '';
+                let d = e.description ? e.description.toLowerCase() : '';
+                if (s.includes('klusteam') || d.includes('klusteam')) return; 
+                
+                e.isBuitenzorg = true; 
+
+                if (s.includes('evenement') || s.includes('vakantie')) {
+                    e.type = 'event';
+                    allParsed.push(e);
+                } else {
+                    let names = e.summary ? e.summary.split(',') : ['Onbekend'];
+                    names.forEach(name => {
+                        let cleanName = name.trim();
+                        if (cleanName) allParsed.push({ ...e, summary: cleanName, type: 'staff' });
+                    });
+                }
+            });
+        }
+
+        if (holidayData) {
+            let h = parseICS(holidayData);
+            h.forEach(e => { e.type = 'holiday'; allParsed.push(e); });
+        }
+
+        allParsed.push(...processHolidays(noordData, 'Noord'));
+        allParsed.push(...processHolidays(middenData, 'Midden'));
+        allParsed.push(...processHolidays(zuidData, 'Zuid'));
+
+        setupDropdown();
+    }).catch(e => {
+        document.getElementById('scheduleContainer').innerHTML = `<p style="color:red; text-align:center;">Fout bij de kalenders ophalen: ${e.message}</p>`;
+    });
+
+    function setupDropdown() {
+        const years = new Set();
+        
+        allParsed.forEach(e => { 
+            if (e.isBuitenzorg && e.start) years.add(e.start.getFullYear()); 
+        });
+        
+        if (years.size === 0) {
+            years.add(new Date().getFullYear());
+        }
+        
+        const sortedYears = Array.from(years).sort((a, b) => a - b);
+        sortedYears.push(sortedYears[sortedYears.length - 1] + 1);
+
+        const select = document.getElementById('yearSelect');
+        select.innerHTML = ''; 
+        
+        const thisYear = new Date().getFullYear();
+        let renderYear = sortedYears.includes(thisYear) ? thisYear : sortedYears[0];
+
+        sortedYears.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (year === renderYear) option.selected = true; 
+            select.appendChild(option);
+        });
+
+        select.disabled = false;
+        select.addEventListener('change', (e) => renderSchedule(parseInt(e.target.value)));
+        
+        document.getElementById('statsBtn').disabled = false;
+        
+        renderSchedule(renderYear);
+        document.getElementById('actionFooter').style.display = 'block';
+    }
+
+    function renderSchedule(year) {
+        const container = document.getElementById('scheduleContainer');
+        let html = '';
+        const monthNames = ["Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
+        const dayNames = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+
+        let rawEmpties = [];
+        
+        let cursor = new Date(year, 0, 1);
+        while(cursor.getDay() !== 5) cursor.setDate(cursor.getDate() + 1); 
+        
+        while(cursor.getFullYear() === year) {
+            let fri = new Date(cursor);
+            fri.setHours(0,0,0,0);
+            let sun = new Date(cursor);
+            sun.setDate(sun.getDate() + 2); 
+            sun.setHours(23,59,59,999);
+            
+            let hasStaff = allParsed.some(e => e.type === 'staff' && isOverlapping(e.start, e.end, fri, sun));
+            if (!hasStaff) {
+                let isClosed = (fri.getMonth() === 0 || fri.getMonth() === 11);
+                rawEmpties.push({
+                    start: fri, end: sun,
+                    summary: isClosed ? 'Terrein Gesloten' : '⚠️ Nog geen staf!',
+                    type: isClosed ? 'closed' : 'empty'
+                });
+            }
+            cursor.setDate(cursor.getDate() + 7);
+        }
+
+        let schoolHolidays = allParsed.filter(e => e.type === 'schoolholiday' && e.start.getFullYear() === year);
+        
+        schoolHolidays.forEach(h => {
+            if (h.summary.toLowerCase().includes('kerst')) return; 
+            
+            let staffDuringHoliday = allParsed.some(e => e.type === 'staff' && isOverlapping(e.start, e.end, h.start, h.end));
+            if (!staffDuringHoliday) {
+                rawEmpties.push({
+                    start: new Date(h.start), 
+                    end: new Date(h.end),
+                    summary: '⚠️ Nog geen staf (Vakantie)!',
+                    type: 'empty'
+                });
+            }
+        });
+
+        rawEmpties.sort((a, b) => a.start - b.start);
+        let emptyPeriods = [];
+        
+        rawEmpties.forEach(ep => {
+            if (emptyPeriods.length === 0) {
+                emptyPeriods.push(ep);
+            } else {
+                let last = emptyPeriods[emptyPeriods.length - 1];
+                
+                if (ep.start <= new Date(last.end.getTime() + 86400000)) { 
+                    if (ep.end > last.end) last.end = new Date(ep.end);
+                    
+                    if (last.type === 'closed' || ep.type === 'closed') {
+                        last.summary = 'Terrein Gesloten';
+                        last.type = 'closed';
+                    } else if (last.summary.includes('Vakantie') || ep.summary.includes('Vakantie')) {
+                        last.summary = '⚠️ Nog geen staf (Vakantie)!';
+                        last.type = 'empty';
+                    }
+                } else {
+                    emptyPeriods.push(ep);
+                }
+            }
+        });
+
+        let combinedTimeline = [...allParsed, ...emptyPeriods];
+
+        let currentWeekStart = new Date(year, 0, 1);
+        currentWeekStart.setDate(currentWeekStart.getDate() - (currentWeekStart.getDay() + 6) % 7); 
+        
+        let lastDayOfYear = new Date(year, 11, 31);
+        let currentMonth = -1;
+
+        html += `<div class="month-block">`;
+
+        while(currentWeekStart <= lastDayOfYear) {
+            let weekDays = [];
+            let weekContainsFirstOfMonth = -1;
+            let newMonthYear = year;
+            
+            for(let i=0; i<7; i++) {
+                let d = new Date(currentWeekStart);
+                d.setDate(d.getDate() + i);
+                weekDays.push(d);
+                if (d.getDate() === 1) {
+                    weekContainsFirstOfMonth = d.getMonth();
+                    newMonthYear = d.getFullYear();
+                }
+            }
+
+            if (currentMonth === -1) {
+                let firstDayInYear = weekDays.find(d => d.getFullYear() === year);
+                currentMonth = firstDayInYear ? firstDayInYear.getMonth() : 0;
+                let isClosedMonth = (currentMonth === 0 || currentMonth === 11);
+                html += `<div class="month-divider ${isClosedMonth ? 'closed-month' : ''}">${monthNames[currentMonth]} ${year}</div>`;
+                html += `<div class="days-header">${dayNames.map(d => `<div>${d}</div>`).join('')}</div>`;
+            } else if (weekContainsFirstOfMonth !== -1) {
+                currentMonth = weekContainsFirstOfMonth;
+                let isClosedMonth = (currentMonth === 0 || currentMonth === 11);
+                html += `<div class="month-divider ${isClosedMonth ? 'closed-month' : ''}">${monthNames[currentMonth]} ${newMonthYear}</div>`;
+                html += `<div class="days-header">${dayNames.map(d => `<div>${d}</div>`).join('')}</div>`;
+            }
+
+            let currentWeekEnd = new Date(currentWeekStart);
+            currentWeekEnd.setDate(currentWeekEnd.getDate() + 6); 
+            currentWeekEnd.setHours(23,59,59,999);
+
+            let weekEvents = combinedTimeline.filter(e => isOverlapping(e.start, e.end, currentWeekStart, currentWeekEnd));
+            weekEvents.sort((a,b) => ((b.end - b.start) - (a.end - a.start)) || (a.start - b.start) || (a.summary.localeCompare(b.summary)));
+            
+            let slots = [];
+            weekEvents.forEach(e => {
+                let placed = false;
+                for(let r=0; r<slots.length; r++) {
+                    if (!slots[r].some(placedE => isOverlapping(e.start, e.end, placedE.start, placedE.end))) {
+                        slots[r].push(e); e._slot = r; placed = true; break;
+                    }
+                }
+                if (!placed) { slots.push([e]); e._slot = slots.length - 1; }
+            });
+
+            html += `<div class="week-row">`;
+            
+            for(let i=0; i<7; i++) {
+                let d = weekDays[i];
+                let isOutOfYear = d.getFullYear() !== year;
+                let isWeekend = (i >= 4) ? 'bg-weekend' : ''; 
+                
+                html += `<div class="bg-cell ${isOutOfYear ? 'out-of-year' : ''} ${isWeekend}" style="grid-column: ${i+1};"></div>`;
+                
+                html += `<div class="day-header-cell ${isOutOfYear ? 'out-of-year' : ''}" style="grid-column: ${i+1};">`;
+                if (!isOutOfYear) {
+                    let dateString = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    html += `<input type="checkbox" class="day-checkbox" value="${dateString}">`;
+                } else {
+                    html += `<div></div>`; 
+                }
+                html += `<span class="day-num">${d.getDate()}</span></div>`;
+            }
+
+            weekEvents.forEach(e => {
+                let startCol = 1;
+                for(let i=0; i<7; i++) {
+                    if (e.start <= weekDays[i]) { startCol = i + 1; break; }
+                }
+                let endCol = 7;
+                for(let i=6; i>=0; i--) {
+                    let endOfDay = new Date(weekDays[i]);
+                    endOfDay.setHours(23,59,59,999);
+                    if (e.end >= endOfDay || e.end >= weekDays[i]) { endCol = i + 1; break; }
+                }
+
+                let span = endCol - startCol + 1;
+                let rowNum = e._slot + 2; 
+                
+                html += `<div class="event-bar bg-${e.type}" 
+                              style="grid-row: ${rowNum}; grid-column: ${startCol} / span ${span};" 
+                              title="${e.summary}">${e.summary}</div>`;
+            });
+
+            html += `</div>`; 
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7); 
+        }
+        html += `</div>`; 
+        container.innerHTML = html;
+    }
+
+    function showStatistics() {
+        const selectedYear = parseInt(document.getElementById('yearSelect').value);
+        document.getElementById('statsYear').textContent = selectedYear;
+        
+        const currentUserStr = document.getElementById('userName').value.trim().toLowerCase();
+        
+        let staffDays = new Map();
+        
+        allParsed.forEach(e => {
+            if (e.type === 'staff') {
+                let current = new Date(e.start);
+                current.setHours(0,0,0,0);
+                let end = new Date(e.end);
+                end.setHours(0,0,0,0);
+                
+                while (current <= end) {
+                    if (current.getFullYear() === selectedYear) {
+                        let dateStr = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+                        
+                        if (!staffDays.has(e.summary)) {
+                            staffDays.set(e.summary, new Set());
+                        }
+                        staffDays.get(e.summary).add(dateStr);
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+            }
+        });
+        
+        let statsArray = [];
+        staffDays.forEach((daysSet, name) => {
+            statsArray.push({ name: name, days: daysSet.size });
+        });
+        
+        statsArray.sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+        
+        let html = '<table class="stat-table"><thead><tr><th>Naam Staflid</th><th>Dagen Gestaft</th></tr></thead><tbody>';
+        if (statsArray.length === 0) {
+            html += '<tr><td colspan="2" style="text-align:center;">Nog niemand ingepland voor dit jaar.</td></tr>';
+        } else {
+            statsArray.forEach((stat) => {
+                let isCurrentUser = currentUserStr !== "" && stat.name.toLowerCase().includes(currentUserStr);
+                let trClass = isCurrentUser ? ' class="highlight-user"' : '';
+                
+                html += `<tr${trClass}><td>${stat.name}</td><td>${stat.days}</td></tr>`;
+            });
+        }
+        html += '</tbody></table>';
+        
+        document.getElementById('statsBody').innerHTML = html;
+        document.getElementById('statsModal').style.display = 'flex';
+    }
+
+    function closeModal(event) {
+        if (event.target === document.getElementById('statsModal')) {
+            document.getElementById('statsModal').style.display = 'none';
+        }
+    }
+
+    function generateEmail() {
+        const nameInput = document.getElementById('userName').value.trim();
+        
+        if (!nameInput) {
+            alert("Vul alsjeblieft eerst je naam in bovenaan de pagina voordat je de aanvraag verstuurt.");
+            document.getElementById('userName').focus();
+            return;
+        }
+
+        const checkedBoxes = document.querySelectorAll('.day-checkbox:checked');
+        
+        if (checkedBoxes.length === 0) {
+            alert("Je hebt nog geen dagen aangevinkt in de kalender!");
+            return;
+        }
+
+        let dates = Array.from(checkedBoxes).map(box => box.value).sort();
+        let selectedDates = dates.map(dateStr => {
+            let d = new Date(dateStr);
+            let options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            return "- " + d.toLocaleDateString('nl-NL', options);
+        });
+
+        const emailTo = "HRM@buitenzorg.nl"; 
+        const emailSubject = `Stafplanning ${nameInput}`;
+        
+        let emailBody = `Beste Patricia,\n\n`;
+        emailBody += `Hierbij geef ik graag mijn wensen door om te komen staffen. In de planningskalender heb ik de volgende dagen aangevinkt als beschikbaar:\n\n`;
+        emailBody += selectedDates.join("\n");
+        emailBody += `\n\nMochten er nog vragen zijn, of als het lastig is in te plannen, dan hoor ik het graag. Ik hoop dat het lukt!\n\n`;
+        emailBody += `Met vriendelijke groet,\n\n${nameInput}`;
+
+        const mailtoLink = `mailto:${emailTo}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+        window.location.href = mailtoLink;
+    }
+</script>
+
+</body>
+</html>
